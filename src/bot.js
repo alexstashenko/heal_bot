@@ -1,4 +1,5 @@
 import { Telegraf } from 'telegraf';
+import express from 'express';
 import dotenv from 'dotenv';
 import GeminiService from './services/gemini.js';
 
@@ -225,20 +226,49 @@ async function startBot() {
             const webhookPath = `/webhook/${BOT_TOKEN}`;
             const webhookUrl = `${WEBHOOK_DOMAIN}${webhookPath}`;
 
-            // Удаляем старый webhook
-            await bot.telegram.deleteWebhook();
+            // Создаем Express приложение
+            const app = express();
 
-            // Устанавливаем новый webhook
-            await bot.telegram.setWebhook(webhookUrl);
-            console.log(`📡 Webhook установлен: ${webhookUrl}`);
+            // Health check endpoint
+            app.get('/', (req, res) => {
+                res.json({ status: 'ok', bot: botInfo.username });
+            });
 
-            // Запускаем Express сервер для webhook
-            bot.startWebhook(webhookPath, null, PORT);
+            // Webhook endpoint
+            app.use(bot.webhookCallback(webhookPath));
 
-            console.log('✅ Бот запущен успешно!');
-            console.log(`📱 Бот: @${botInfo.username}`);
-            console.log(`🌍 Режим: webhook`);
-            console.log(`🔌 Порт: ${PORT}`);
+            // Запускаем сервер
+            const server = app.listen(PORT, async () => {
+                // Удаляем старый webhook
+                await bot.telegram.deleteWebhook();
+
+                // Устанавливаем новый webhook
+                await bot.telegram.setWebhook(webhookUrl);
+                console.log(`📡 Webhook установлен: ${webhookUrl}`);
+
+                console.log('✅ Бот запущен успешно!');
+                console.log(`📱 Бот: @${botInfo.username}`);
+                console.log(`🌍 Режим: webhook`);
+                console.log(`🔌 Порт: ${PORT}`);
+                console.log(`🏥 Health check: ${WEBHOOK_DOMAIN}/`);
+            });
+
+            // Graceful shutdown для webhook
+            process.once('SIGINT', () => {
+                console.log('\n🛑 Остановка сервера...');
+                server.close(() => {
+                    console.log('Сервер остановлен');
+                    process.exit(0);
+                });
+            });
+
+            process.once('SIGTERM', () => {
+                console.log('\n🛑 Остановка сервера...');
+                server.close(() => {
+                    console.log('Сервер остановлен');
+                    process.exit(0);
+                });
+            });
 
         } else {
             // Development режим с long polling (локально)
