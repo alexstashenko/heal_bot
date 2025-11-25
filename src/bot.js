@@ -17,6 +17,19 @@ if (!BOT_TOKEN || !GEMINI_API_KEY) {
 const bot = new Telegraf(BOT_TOKEN);
 const gemini = new GeminiService(GEMINI_API_KEY);
 
+// Middleware для логирования входящих обновлений
+bot.use(async (ctx, next) => {
+    console.log('📨 Входящее обновление:', {
+        update_id: ctx.update.update_id,
+        message: ctx.message ? {
+            from: ctx.from.username,
+            text: ctx.message.text
+        } : 'нет сообщения',
+        type: ctx.updateType
+    });
+    return next();
+});
+
 // Хранилище состояний пользователей (в памяти для прототипа)
 const userStates = new Map();
 
