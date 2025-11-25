@@ -21,8 +21,11 @@ class GeminiService {
      * @returns {Promise<string>} - Анализ от Gemini
      */
     async analyzeGratitude(userText) {
-        try {
-            const prompt = `Ты - помощник для wellness-практик, помогаешь людям развивать благодарность и позитивное мышление.
+        const maxRetries = 2;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const prompt = `Ты - помощник для wellness-практик, помогаешь людям развивать благодарность и позитивное мышление.
 
 Пользователь поделился следующим:
 "${userText}"
@@ -40,25 +43,52 @@ class GeminiService {
 
 Ответ:`;
 
-            console.log('📤 Отправка запроса в Gemini...');
-            const result = await this.model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+                console.log(`📤 Отправка запроса в Gemini (попытка ${attempt}/${maxRetries})...`);
+                const result = await this.model.generateContent(prompt);
+                const response = await result.response;
 
-            console.log('✅ Получен ответ от Gemini');
-            return text.trim();
-        } catch (error) {
-            console.error('❌ Ошибка Gemini API:');
-            console.error('Тип ошибки:', error.name);
-            console.error('Сообщение:', error.message);
-            if (error.response) {
-                console.error('Детали ответа:', error.response);
+                // Проверяем на блокировку safety filters
+                if (response.promptFeedback?.blockReason) {
+                    console.error('🚫 Контент заблокирован:', response.promptFeedback.blockReason);
+                    throw new Error('Контент был заблокирован фильтрами безопасности');
+                }
+
+                const text = response.text();
+
+                console.log('✅ Получен ответ от Gemini');
+
+                // Если ответ пустой и есть ещё попытки - повторяем
+                if ((!text || text.trim().length === 0) && attempt < maxRetries) {
+                    console.warn(`⚠️  Пустой ответ, попытка ${attempt}/${maxRetries}`);
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Небольшая задержка
+                    continue;
+                }
+
+                return text.trim();
+            } catch (error) {
+                console.error('❌ Ошибка Gemini API:');
+                console.error('Тип ошибки:', error.name);
+                console.error('Сообщение:', error.message);
+                if (error.response) {
+                    console.error('Детали ответа:', error.response);
+                }
+                if (error.status) {
+                    console.error('HTTP статус:', error.status);
+                }
+
+                // Если это последняя попытка - пробрасываем ошибку
+                if (attempt === maxRetries) {
+                    throw new Error('Не удалось получить ответ от AI. Попробуйте позже.');
+                }
+
+                // Иначе ждём и повторяем
+                console.log(`🔄 Повтор через 1 секунду...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            if (error.status) {
-                console.error('HTTP статус:', error.status);
-            }
-            throw new Error('Не удалось получить ответ от AI. Попробуйте позже.');
         }
+
+        // Если дошли сюда - все попытки вернули пустой ответ
+        return '';
     }
 
     /**
