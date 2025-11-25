@@ -198,11 +198,42 @@ async function startBot() {
             console.log('✅ Gemini API подключен');
         }
 
-        // Запуск бота
-        await bot.launch();
-        console.log('✅ Бот запущен успешно!');
-        console.log(`📱 Бот: @${bot.botInfo.username}`);
-        console.log(`🌍 Режим: ${process.env.NODE_ENV || 'production'}`);
+        // Определяем режим запуска
+        const PORT = process.env.PORT || 3000;
+        const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
+
+        if (WEBHOOK_DOMAIN) {
+            // Production режим с webhook (Railway)
+            console.log('🌐 Запуск в webhook режиме');
+
+            const webhookPath = `/webhook/${BOT_TOKEN}`;
+            const webhookUrl = `${WEBHOOK_DOMAIN}${webhookPath}`;
+
+            // Удаляем старый webhook
+            await bot.telegram.deleteWebhook();
+
+            // Устанавливаем новый webhook
+            await bot.telegram.setWebhook(webhookUrl);
+            console.log(`📡 Webhook установлен: ${webhookUrl}`);
+
+            // Запускаем Express сервер для webhook
+            bot.startWebhook(webhookPath, null, PORT);
+
+            console.log('✅ Бот запущен успешно!');
+            console.log(`📱 Бот: @${bot.botInfo.username}`);
+            console.log(`🌍 Режим: webhook`);
+            console.log(`🔌 Порт: ${PORT}`);
+
+        } else {
+            // Development режим с long polling (локально)
+            console.log('💻 Запуск в polling режиме');
+
+            await bot.launch();
+
+            console.log('✅ Бот запущен успешно!');
+            console.log(`📱 Бот: @${bot.botInfo.username}`);
+            console.log(`🌍 Режим: ${process.env.NODE_ENV || 'development'}`);
+        }
 
     } catch (error) {
         console.error('❌ Ошибка запуска бота:', error);
