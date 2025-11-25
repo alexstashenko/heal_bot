@@ -198,6 +198,9 @@ async function startBot() {
             console.log('✅ Gemini API подключен');
         }
 
+        // Получаем информацию о боте
+        const botInfo = await bot.telegram.getMe();
+
         // Определяем режим запуска
         const PORT = process.env.PORT || 3000;
         const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
@@ -220,7 +223,7 @@ async function startBot() {
             bot.startWebhook(webhookPath, null, PORT);
 
             console.log('✅ Бот запущен успешно!');
-            console.log(`📱 Бот: @${bot.botInfo.username}`);
+            console.log(`📱 Бот: @${botInfo.username}`);
             console.log(`🌍 Режим: webhook`);
             console.log(`🔌 Порт: ${PORT}`);
 
@@ -231,7 +234,7 @@ async function startBot() {
             await bot.launch();
 
             console.log('✅ Бот запущен успешно!');
-            console.log(`📱 Бот: @${bot.botInfo.username}`);
+            console.log(`📱 Бот: @${botInfo.username}`);
             console.log(`🌍 Режим: ${process.env.NODE_ENV || 'development'}`);
         }
 
