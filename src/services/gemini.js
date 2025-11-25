@@ -7,7 +7,7 @@ class GeminiService {
     constructor(apiKey) {
         this.genAI = new GoogleGenerativeAI(apiKey);
         this.model = this.genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-flash',
             generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 500,
@@ -40,13 +40,23 @@ class GeminiService {
 
 Ответ:`;
 
+            console.log('📤 Отправка запроса в Gemini...');
             const result = await this.model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
 
+            console.log('✅ Получен ответ от Gemini');
             return text.trim();
         } catch (error) {
-            console.error('Ошибка Gemini API:', error);
+            console.error('❌ Ошибка Gemini API:');
+            console.error('Тип ошибки:', error.name);
+            console.error('Сообщение:', error.message);
+            if (error.response) {
+                console.error('Детали ответа:', error.response);
+            }
+            if (error.status) {
+                console.error('HTTP статус:', error.status);
+            }
             throw new Error('Не удалось получить ответ от AI. Попробуйте позже.');
         }
     }
