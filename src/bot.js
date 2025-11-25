@@ -192,8 +192,22 @@ bot.on('text', async (ctx) => {
     await ctx.sendChatAction('typing');
 
     try {
+        console.log('🎯 Запуск анализа для пользователя:', ctx.from.username, '| Текст:', userText.substring(0, 50) + '...');
+
         // Анализируем через Gemini
         const analysis = await gemini.analyzeGratitude(userText);
+
+        console.log('✅ Анализ получен, длина:', analysis ? analysis.length : 0);
+
+        // Проверяем что ответ не пустой
+        if (!analysis || analysis.trim().length === 0) {
+            console.warn('⚠️  Gemini вернул пустой ответ');
+            await ctx.reply(
+                '🤔 AI не смог сгенерировать инсайт. Попробуй описать практику чуть подробнее или попробуй снова через /practice'
+            );
+            userStates.delete(userId);
+            return;
+        }
 
         // Отправляем результат
         await ctx.reply(
@@ -216,7 +230,10 @@ bot.on('text', async (ctx) => {
         userStates.delete(userId);
 
     } catch (error) {
-        console.error('Ошибка обработки практики:', error);
+        console.error('❌ Ошибка обработки практики:');
+        console.error('Тип:', error.name);
+        console.error('Сообщение:', error.message);
+        console.error('Stack:', error.stack);
 
         await ctx.reply(
             '😔 Произошла ошибка при анализе. Попробуй ещё раз через /practice',
