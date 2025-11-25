@@ -62,15 +62,29 @@ class GeminiService {
     }
 
     /**
-     * Проверка работоспособности API
+     * Проверка работоспособности API с таймаутом
      * @returns {Promise<boolean>}
      */
     async healthCheck() {
         try {
-            await this.model.generateContent('Привет');
+            console.log('Тестовый запрос к Gemini API...');
+
+            // Таймаут 10 секунд
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), 10000)
+            );
+
+            const checkPromise = this.model.generateContent('Test');
+
+            await Promise.race([checkPromise, timeoutPromise]);
+
+            console.log('✅ Gemini API отвечает');
             return true;
         } catch (error) {
-            console.error('Health check failed:', error);
+            console.error('⚠️  Gemini API недоступен:', error.message);
+            if (error.status) {
+                console.error('HTTP статус:', error.status);
+            }
             return false;
         }
     }
