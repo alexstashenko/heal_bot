@@ -10,7 +10,7 @@ class GeminiService {
             model: 'gemini-2.5-flash',
             generationConfig: {
                 temperature: 0.7,
-                maxOutputTokens: 500,
+                maxOutputTokens: 1500, // Увеличено для thinking mode
             }
         });
     }
