@@ -47,9 +47,36 @@ class GeminiService {
                 const result = await this.model.generateContent(prompt);
                 const response = await result.response;
 
+                // Детальное логирование response
+                console.log('📋 Response details:', {
+                    candidates: response.candidates?.length || 0,
+                    promptFeedback: response.promptFeedback,
+                    usageMetadata: response.usageMetadata
+                });
+
                 // Проверяем на блокировку safety filters
                 if (response.promptFeedback?.blockReason) {
                     console.error('🚫 Контент заблокирован:', response.promptFeedback.blockReason);
+                    throw new Error('Контент был заблокирован фильтрами безопасности');
+                }
+
+                // Проверяем есть ли candidates
+                if (!response.candidates || response.candidates.length === 0) {
+                    console.error('⚠️  Нет candidates в ответе');
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        continue;
+                    }
+                    return '';
+                }
+
+                // Проверяем finishReason
+                const candidate = response.candidates[0];
+                console.log('🔍 Candidate finishReason:', candidate.finishReason);
+
+                if (candidate.finishReason === 'SAFETY') {
+                    console.error('🚫 Ответ заблокирован safety filters');
+                    console.error('Safety ratings:', candidate.safetyRatings);
                     throw new Error('Контент был заблокирован фильтрами безопасности');
                 }
 
