@@ -1,0 +1,25 @@
+{
+  "name": "heal-bot",
+  "version": "0.1.0",
+  "description": "HEAL AI Wellness Telegram Bot with Gemini Flash",
+  "type": "module",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "node --watch src/bot.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "wellness",
+    "gemini",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5"
+  }
+}
