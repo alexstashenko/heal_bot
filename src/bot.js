@@ -1,8 +1,8 @@
 import { Telegraf, Markup } from 'telegraf';
 import express from 'express';
 import dotenv from 'dotenv';
-import { GeminiService } from './services/gemini.js';
-import { StateManager } from './services/stateManager.js';  // NEW: Redis state management
+import GeminiService from './services/gemini.js';  // default import
+import { StateManager } from './services/stateManager.js';
 
 dotenv.config();
 
