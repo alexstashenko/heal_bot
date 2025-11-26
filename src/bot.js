@@ -8,8 +8,6 @@ dotenv.config();
 
 // Конфигурация
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
-const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 if (!BOT_TOKEN) { // GEMINI_API_KEY is now handled within GeminiService
@@ -675,111 +673,26 @@ bot.on('text', async (ctx) => {
 });
 
 // ==================== ЗАПУСК БОТА ====================
+// ==================== EXPRESS APP SETUP (VERCEL) ====================
+const PORT = process.env.PORT || 3000;
+const app = express();
 
-async function startBot() {
-    try {
-        console.log('🔄 Проверка подключения к Gemini...');
-        const isHealthy = await gemini.healthCheck();
-
-        if (!isHealthy) {
-            console.warn('⚠️  Gemini API недоступен, но бот запустится');
-        } else {
-            console.log('✅ Gemini API подключен');
-        }
-
-        // Получаем информацию о боте
-        const botInfo = await bot.telegram.getMe();
-
-        // Определяем режим запуска
-        const PORT = process.env.PORT || 3000;
-        const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
-
-        if (WEBHOOK_DOMAIN) {
-            // Production режим с webhook (Railway)
-            console.log('🌐 Запуск в webhook режиме');
-
-            const webhookPath = `/webhook/${BOT_TOKEN}`;
-            const webhookUrl = `${WEBHOOK_DOMAIN}${webhookPath}`;
-
-            // Создаем Express приложение
-            const app = express();
-
-            // Health check endpoint
-            app.get('/', (req, res) => {
-                res.json({ status: 'ok', bot: botInfo.username });
-            });
-
-            // Webhook endpoint
-            app.use(bot.webhookCallback(webhookPath));
-
-            // Запускаем сервер
-            const server = app.listen(PORT, async () => {
-                // Удаляем старый webhook
-                await bot.telegram.deleteWebhook();
-
-                // Устанавливаем новый webhook
-                await bot.telegram.setWebhook(webhookUrl);
-                console.log(`📡 Webhook установлен: ${webhookUrl}`);
-
-                console.log('✅ Бот запущен успешно!');
-                console.log(`📱 Бот: @${botInfo.username}`);
-                console.log(`🌍 Режим: webhook`);
-                console.log(`🔌 Порт: ${PORT}`);
-                console.log(`🏥 Health check: ${WEBHOOK_DOMAIN}/`);
-            });
-
-            // Graceful shutdown для webhook
-            process.once('SIGINT', () => {
-                console.log('\n🛑 Остановка сервера...');
-                server.close(() => {
-                    console.log('Сервер остановлен');
-                    process.exit(0);
-                });
-            });
-
-            process.once('SIGTERM', () => {
-                console.log('\n🛑 Остановка сервера...');
-                server.close(() => {
-                    console.log('Сервер остановлен');
-                    process.exit(0);
-                });
-            });
-
-        } else {
-            // Development режим с long polling (локально)
-            console.log('💻 Запуск в polling режиме');
-
-            await bot.launch();
-
-            console.log('✅ Бот запущен успешно!');
-            console.log(`📱 Бот: @${botInfo.username}`);
-            console.log(`🌍 Режим: ${process.env.NODE_ENV || 'development'}`);
-        }
-
-    } catch (error) {
-        console.error('❌ Ошибка запуска бота:', error);
-        process.exit(1);
-    }
-}
-
-// Graceful shutdown для polling режима
-process.once('SIGINT', () => {
-    console.log('\n🛑 Остановка бота...');
-    bot.stop('SIGINT');
+// Health check endpoint
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'HEAL Bot is running' });
 });
 
-process.once('SIGTERM', () => {
-    console.log('\n🛑 Остановка бота...');
-    bot.stop('SIGTERM');
-});
+// Webhook endpoint
+const webhookPath = `/webhook/${BOT_TOKEN}`;
+app.use(express.json());
+app.use(webhookPath, bot.webhookCallback(webhookPath));
 
-// Запуск
-// ==================== VERCEL SERVERLESS EXPORT ====================
-// Для Vercel экспортируем Express app как serverless function
-// Webhook устанавливается вручную после деплоя через Telegram API
+console.log(`📡 Webhook path готов: ${webhookPath}`);
+console.log(`🚀 Express app готов для Vercel export`);
 
+// Export для Vercel Serverless
 export default app;
 
-// NOTE: В Vercel webhook устанавливается командой:
+// NOTE: После деплоя на Vercel установите webhook командой:
 // curl -F "url=https://<your-vercel-url>/webhook/<BOT_TOKEN>" \
 //      https://api.telegram.org/bot<BOT_TOKEN>/setWebhook
