@@ -70,8 +70,8 @@ curl -F "url=<VERCEL_URL>/webhook/<BOT_TOKEN>" \
 
 **Пример:**
 ```bash
-curl -F "url=https://heal-bot-xyz.vercel.app/webhook/8093833928:AAFhvKXccXxYyEELCSkonaMav0tDKnbHUkI" \
-     https://api.telegram.org/bot8093833928:AAFhvKXccXxYyEELCSkonaMav0tDKnbHUkI/setWebhook
+curl -F "url=https://heal-bot-xyz.vercel.app/webhook/<BOT_TOKEN>" \
+     https://api.telegram.org/bot<BOT_TOKEN>/setWebhook
 ```
 
 **Ответ должен быть:**
