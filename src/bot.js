@@ -1,22 +1,27 @@
 import { Telegraf, Markup } from 'telegraf';
 import express from 'express';
 import dotenv from 'dotenv';
-import GeminiService from './services/gemini.js';
+import { GeminiService } from './services/gemini.js';
+import { StateManager } from './services/stateManager.js';  // NEW: Redis state management
 
-// Загрузка переменных окружения
 dotenv.config();
 
+// Конфигурация
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN;
+const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-if (!BOT_TOKEN || !GEMINI_API_KEY) {
-    console.error('❌ Ошибка: BOT_TOKEN и GEMINI_API_KEY должны быть указаны в .env файле');
+if (!BOT_TOKEN) { // GEMINI_API_KEY is now handled within GeminiService
+    console.error('❌ Ошибка: BOT_TOKEN должен быть указан в .env файле');
     process.exit(1);
 }
 
 // Инициализация бота и сервисов
 const bot = new Telegraf(BOT_TOKEN);
-const gemini = new GeminiService(GEMINI_API_KEY);
+const gemini = new GeminiService();
+
+// NOTE: userStates Map удалён - теперь используем Redis через StateManager
 
 // Middleware для логирования входящих обновлений
 bot.use(async (ctx, next) => {
@@ -30,9 +35,6 @@ bot.use(async (ctx, next) => {
     });
     return next();
 });
-
-// Хранилище состояний пользователей (в памяти для прототипа)
-const userStates = new Map();
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
@@ -206,7 +208,7 @@ async function handleStepInput(ctx, state) {
                             ['❓ Помощь']
                         ]).resize()
                     );
-                    userStates.delete(userId);
+                    await StateManager.delete(userId);
                     return;
                 }
 
@@ -304,7 +306,7 @@ async function handleStepInput(ctx, state) {
                 ['❓ Помощь']
             ]).resize()
         );
-        userStates.delete(userId);
+        await StateManager.delete(userId);
     }
 }
 
@@ -400,7 +402,7 @@ bot.command('practice', async (ctx) => {
     const userId = ctx.from.id;
 
     // Инициализируем состояние для новой практики
-    userStates.set(userId, {
+    await StateManager.set(userId, {
         mode: 'heal_practice',
         currentStep: 'H',
         substep: 'H1',  // Track H1/H2/H3
@@ -417,7 +419,7 @@ bot.command('practice', async (ctx) => {
 bot.hears('✅ Практика ОК-ности', async (ctx) => {
     const userId = ctx.from.id;
 
-    userStates.set(userId, {
+    await StateManager.set(userId, {
         mode: 'heal_practice',
         currentStep: 'H',
         substep: 'H1',  // Track H1/H2/H3
@@ -445,7 +447,7 @@ bot.hears('❓ Помощь', async (ctx) => {
 
 bot.hears(['❓ Есть вопрос', '❓ Еще вопрос'], async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.mode !== 'heal_practice') {
         await ctx.reply('Используйте /practice чтобы начать практику HEAL ✨');
@@ -463,7 +465,7 @@ bot.hears(['❓ Есть вопрос', '❓ Еще вопрос'], async (ctx) 
 
 bot.hears('⬅️ Назад к практике', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.mode !== 'heal_practice') {
         return;
@@ -497,7 +499,7 @@ bot.hears('⬅️ Назад к практике', async (ctx) => {
 
 bot.hears('➡️ Продолжить', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.mode !== 'heal_practice' || state.waitingFor !== 'navigation') {
         return;
@@ -524,7 +526,7 @@ bot.hears('➡️ Продолжить', async (ctx) => {
 
 bot.hears('✅ Завершить практику', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.mode !== 'heal_practice') {
         return;
@@ -549,7 +551,7 @@ bot.hears('✅ Завершить практику', async (ctx) => {
         );
 
         // Очищаем состояние
-        userStates.delete(userId);
+        await StateManager.delete(userId);
         console.log('✅ HEAL практика успешно завершена');
 
     } catch (error) {
@@ -562,7 +564,7 @@ bot.hears('✅ Завершить практику', async (ctx) => {
                 ['❓ Помощь']
             ]).resize()
         );
-        userStates.delete(userId);
+        await StateManager.delete(userId);
     }
 });
 
@@ -570,7 +572,7 @@ bot.hears('✅ Завершить практику', async (ctx) => {
 
 bot.hears('✅ Продолжить практику', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.waitingFor !== 'mixed_choice') {
         return;
@@ -593,7 +595,7 @@ bot.hears('✅ Продолжить практику', async (ctx) => {
 
 bot.hears('🤍 Позаботиться о себе', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     if (!state || state.waitingFor !== 'mixed_choice') {
         return;
@@ -616,16 +618,16 @@ bot.hears('🤍 Позаботиться о себе', async (ctx) => {
             ['❓ Помощь']
         ]).resize()
     );
-    userStates.delete(userId);
+    await StateManager.delete(userId);
 });
 
 bot.hears('❌ Отменить', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     // Обработка отмены из MIXED состояния
     if (state && state.waitingFor === 'mixed_choice') {
-        userStates.delete(userId);
+        await StateManager.delete(userId);
         await ctx.reply(
             'Практика отменена. Возвращайтесь когда будете готовы! 😊',
             Markup.keyboard([
@@ -638,7 +640,7 @@ bot.hears('❌ Отменить', async (ctx) => {
 
 bot.hears('❌ Отменить практику', async (ctx) => {
     const userId = ctx.from.id;
-    userStates.delete(userId);
+    await StateManager.delete(userId);
 
     await ctx.reply(
         'Практика отменена. Возвращайтесь когда будете готовы! 😊',
@@ -653,7 +655,7 @@ bot.hears('❌ Отменить практику', async (ctx) => {
 
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
-    const state = userStates.get(userId);
+    const state = await StateManager.get(userId);
 
     // Если пользователь не в практике
     if (!state || state.mode !== 'heal_practice') {
@@ -772,4 +774,12 @@ process.once('SIGTERM', () => {
 });
 
 // Запуск
-startBot();
+// ==================== VERCEL SERVERLESS EXPORT ====================
+// Для Vercel экспортируем Express app как serverless function
+// Webhook устанавливается вручную после деплоя через Telegram API
+
+export default app;
+
+// NOTE: В Vercel webhook устанавливается командой:
+// curl -F "url=https://<your-vercel-url>/webhook/<BOT_TOKEN>" \
+//      https://api.telegram.org/bot<BOT_TOKEN>/setWebhook
